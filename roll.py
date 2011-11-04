@@ -61,6 +61,9 @@ advanced_text = """
           45: 1 -> 10 + 6, 9, 7, 6 [+7] <<<>>> 5, 4, 3, 2
 
     Roll types and modifiers can also be used when displaying probabilities.
+
+    Rolls of more than 10 dice are reformulated as smaller rolls with static
+    bonus.  Add a 'b' to the end of a roll to disable this behavior.
 """
 
 
@@ -69,7 +72,6 @@ class CommandLoop(cmd.Cmd, object):
     intro = """
     L5R Dice Rolling: type 'help' for options
     """
-
     def do_help(self, s):
         if s == 'advanced':
             print advanced_text
@@ -110,7 +112,7 @@ def main():
 
 def parse_input(in_string):
     """
-    Extract roll parameters from a string.
+    Extract throw parameters from a string.
 
     Returns a tuple (r, k, kind, mod) where
       r:    number of dice to roll
@@ -122,6 +124,7 @@ def parse_input(in_string):
         (\d+)k(\d+)             # dice to roll and keep
         ([mue])?                # optional kind
         (\s*[+-]\s*\d+)?        # optional modifier
+        (\s*b\s*)?              # optional uncapped roll
         \s*$                    # and nothing else
         ''', re.VERBOSE)
 
@@ -129,11 +132,58 @@ def parse_input(in_string):
     if not m:
         return
 
-    r, k = int(m.groups()[0]), int(m.groups()[1])
-    kind = 's' if not m.groups()[2] else m.groups()[2]
-    mod = 0 if not m.groups()[3] else int(m.groups()[3])
+    p = m.groups()
+
+    r, k = int(p[0]), int(p[1])
+    kind = 's' if not p[2] else p[2]
+    mod = 0 if not p[3] else int(p[3])
+
+    # if the roll is capped (the default), call the cap function and print
+    # a notification if it modified the throw parameters.
+    if not p[4]:
+        pr, pk, pm = r, k, mod
+        r, k, mod = cap(r, k, mod)
+        if pr != r or pk != k:
+            old = show_par(pr, pk, pm)
+            new = show_par(r, k, mod)
+            print '\n  {0} ==> {1}'.format(old, new)
 
     return r, k, kind, mod
+
+
+def show_par(r, k, mod):
+    """Returns string describing throw parameters."""
+    bonus = ''
+    if mod < 0:
+        bonus = ' - {0}'.format(-mod)
+    elif mod > 0:
+        bonus = ' + {0}'.format(mod)
+    return '{0}k{1}{2}'.format(r, k, bonus)
+
+
+def cap(r, k, mod):
+    """
+    Convert excessively large numbers of thrown dice to flat bonuses.
+
+    The roll-and-keep rules suggest a maximum of 10 dice be rolled. Every two
+    rolled dice above 10 are converted to a single kept dice. Once there are
+    10 kept dice, any additional unkept or kept dice are converted into a
+    flat +2 bonus.
+    """
+    # convert rolled to kept dice at 2:1 ratio
+    while r > 11 and k < 10:
+        r -= 2
+        k += 1
+
+    # additional rolled or kept over 10 become a static +2 bonus
+    if r > 10:
+        mod += 2 * (r - 10)
+        r = 10
+    if k > 10:
+        mod += 2 * (k - 10)
+        k = 10
+
+    return r, k, mod
 
 
 ########## Dice Rolling ##########
@@ -186,16 +236,20 @@ def throw(r, k, kind, mod):
     """Print a single throw with the given kind and modifier."""
     rolls = [roll(kind) for i in range(r)]
     rolls.sort(reverse=True)
-    kept, others = rolls[:k], rolls[k:]
+    high_rolls, low_rolls = rolls[:k], rolls[k:]
 
-    print '\n  {0}:'.format(sum(r for r,s in kept) + mod),
-    print ', '.join(s for r,s in kept),
+    result = '{0}: '.format(sum(r for r,s in high_rolls) + mod)
+    kept = ', '.join(s for r, s in high_rolls)
+
+    bonus = ''
     if mod != 0:
-        print '[{0:+}]'.format(mod),
-    if others:
-        print '<<<>>>', ', '.join(s for r,s in others),
-    print '\n'
+        bonus = ' [{0:+}]'.format(mod)
 
+    unkept = ''
+    if low_rolls:
+        unkept = ' <<<>>> ' + ', '.join(s for r, s in low_rolls)
+
+    print '\n  ' + result + kept + bonus + unkept + '\n'
 
 def show_prob(r, k, kind, mod):
     """Print a table of probabilites for the given throw"""
