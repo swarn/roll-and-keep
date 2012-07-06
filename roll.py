@@ -16,6 +16,8 @@
 #
 # Roll-and-Keep is a trademark of Alderac Entertainment Group
 
+from __future__ import print_function
+
 import random
 import re
 import cmd
@@ -262,11 +264,10 @@ def show_prob(r, k, kind, mod):
     TNs = [min_TN + i * 5 for i in range(14)]
     probs = [throw_v_or_up(r, k, TN, kind) for TN in TNs]
 
-    print('\n  TN:', end=' ')
-    print(''.join('{0:^5}'.format(TN + mod) for TN in TNs))
-    print('   %:', end=' ')
-    print(''.join('{0:^5.0%}'.format(p) for p in probs))
-    print()
+    tn_line = ' TN: ' + ''.join('{0:^5}'.format(TN + mod) for TN in TNs)
+    prob_line = '   %: ' + ''.join('{0:^5.0%}'.format(p) for p in probs)
+    print('\n', tn_line)
+    print(prob_line, '\n')
 
 
 ########## Calculating Probabilities ##########
