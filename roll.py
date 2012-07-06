@@ -1,5 +1,5 @@
 # roll.py: simulate and calculate odds for roll-and-keep dice rolling
-# Copyright (C) 2011, Seth Warn
+# Copyright (C) 2012, Seth Warn
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -74,16 +74,16 @@ class CommandLoop(cmd.Cmd, object):
     """
     def do_help(self, s):
         if s == 'advanced':
-            print advanced_text
+            print(advanced_text)
         else:
-            print help_text
+            print(help_text)
 
     def default(self, s):
         opts = parse_input(s)
         if opts:
             throw(*opts)
         else:
-            print '\n  *** invalid input string ***\n'
+            print('\n  *** invalid input string ***\n')
 
     def emptyline(self):
         pass
@@ -93,10 +93,10 @@ class CommandLoop(cmd.Cmd, object):
         if opts:
             show_prob(*opts)
         else:
-            print '\n  *** invalid input string ***\n'
+            print('\n  *** invalid input string ***\n')
 
     def do_EOF(self, s):
-        print
+        print()
         return True
 
     def do_quit(self, s):
@@ -146,7 +146,7 @@ def parse_input(in_string):
         if pr != r or pk != k:
             old = show_par(pr, pk, pm)
             new = show_par(r, k, mod)
-            print '\n  {0} ==> {1}'.format(old, new)
+            print('\n  {0} ==> {1}'.format(old, new))
 
     return r, k, kind, mod
 
@@ -249,7 +249,7 @@ def throw(r, k, kind, mod):
     if low_rolls:
         unkept = ' <<<>>> ' + ', '.join(s for r, s in low_rolls)
 
-    print '\n  ' + result + kept + bonus + unkept + '\n'
+    print('\n  ' + result + kept + bonus + unkept + '\n')
 
 def show_prob(r, k, kind, mod):
     """Print a table of probabilites for the given throw"""
@@ -262,11 +262,11 @@ def show_prob(r, k, kind, mod):
     TNs = [min_TN + i * 5 for i in range(14)]
     probs = [throw_v_or_up(r, k, TN, kind) for TN in TNs]
 
-    print '\n  TN:',
-    print ''.join('{0:^5}'.format(TN + mod) for TN in TNs)
-    print '   %:',
-    print ''.join('{0:^5.0%}'.format(p) for p in probs)
-    print
+    print('\n  TN:', end=' ')
+    print(''.join('{0:^5}'.format(TN + mod) for TN in TNs))
+    print('   %:', end=' ')
+    print(''.join('{0:^5.0%}'.format(p) for p in probs))
+    print()
 
 
 ########## Calculating Probabilities ##########
