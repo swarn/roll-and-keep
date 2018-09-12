@@ -16,12 +16,11 @@
 #
 # Roll-and-Keep is a trademark of Alderac Entertainment Group
 
-from __future__ import print_function
-
 import random
 import re
 import cmd
 from math import factorial
+from functools import partial, lru_cache
 
 random.seed()
 
@@ -54,6 +53,7 @@ advanced_text = """
         6k3u   -- (u)nskilled, dice do not explode
         6k3m   -- (m)astery, dice explode on 9 or 10
         6k3e   -- (e)mphasis, reroll a one, once, before any explosions
+        6k3em  -- combine emphasis and mastery
 
     You can also add or subtract a modifier by adding "+ [mod]" or "- [mod]"
     after a roll.  Here is an example of an 8k4 roll, with an extra +7
@@ -116,15 +116,15 @@ def parse_input(in_string):
     """
     Extract throw parameters from a string.
 
-    Returns a tuple (r, k, kind, mod) where
+    Returns a tuple (r, k, mods, add) where
       r:    number of dice to roll
       k:    number of dice to keep
-      kind: type of roll, one of 's', 'm', 'u', 'e'
-      mod:  static bonus/penalty to roll
+      mods: variants of roll mechanics, chars from [ume]
+      add:  static bonus/penalty to roll
     """
     regex = re.compile(r'''
         (\d+)k(\d+)             # dice to roll and keep
-        ([mue])?                # optional kind
+        ([mue]*)?               # optional kind
         (\s*[+-]\s*\d+)?        # optional modifier
         (\s*b\s*)?              # optional uncapped roll
         \s*$                    # and nothing else
@@ -137,20 +137,24 @@ def parse_input(in_string):
     p = m.groups()
 
     r, k = int(p[0]), int(p[1])
-    kind = 's' if not p[2] else p[2]
-    mod = 0 if not p[3] else int(p[3])
+    mods = '' if not p[2] else p[2]
+    mods = 'em' if mods == 'me' else mods
+    if 'u' in mods and 'm' in mods:
+        return
+    add = 0 if not p[3] else int(p[3])
+    capped = not p[4]
 
     # if the roll is capped (the default), call the cap function and print
     # a notification if it modified the throw parameters.
-    if not p[4]:
-        pr, pk, pm = r, k, mod
-        r, k, mod = cap(r, k, mod)
-        if pr != r or pk != k:
-            old = show_par(pr, pk, pm)
-            new = show_par(r, k, mod)
+    if capped:
+        r_new, k_new, add_new = cap(r, k, add)
+        if r_new != r or k_new != k:
+            old = show_par(r, k, add)
+            new = show_par(r_new, k_new, add_new)
             print('\n  {0} ==> {1}'.format(old, new))
+            r, k, add = r_new, k_new, add_new
 
-    return r, k, kind, mod
+    return r, k, mods, add
 
 
 def show_par(r, k, mod):
@@ -163,7 +167,7 @@ def show_par(r, k, mod):
     return '{0}k{1}{2}'.format(r, k, bonus)
 
 
-def cap(r, k, mod):
+def cap(r, k, add):
     """
     Convert excessively large numbers of thrown dice to flat bonuses.
 
@@ -179,13 +183,13 @@ def cap(r, k, mod):
 
     # additional rolled or kept over 10 become a static +2 bonus
     if r > 10:
-        mod += 2 * (r - 10)
+        add += 2 * (r - 10)
         r = 10
     if k > 10:
-        mod += 2 * (k - 10)
+        add += 2 * (k - 10)
         k = 10
 
-    return r, k, mod
+    return r, k, add
 
 
 ########## Dice Rolling ##########
@@ -211,22 +215,30 @@ def d10():
     return random.randint(1,10)
 
 
-def roll(kind):
+def roll(mods):
     """
     Perform a single, L5R-style die roll of the given kind.
 
+    mods: a string containing a subset of 'emu', which change the rules of
+    the roll as described above.
+
     returns a tuple: (result, (string representing roll sequence))
     """
-    explode = {'u' : 11, 's' : 10, 'e' : 10, 'm' : 9 }
+    expertise = 'e' in mods
+    explode = 10
+    if 'm' in mods:
+        explode = 9
+    elif 'u' in mods:
+        explode = 11
 
     dice = [d10()]
     sequence = ''
 
-    if kind == 'e' and dice[0] == 1:
+    if 'e' in mods and dice[0] == 1:
         sequence = '1 -> '
         dice = [d10()]
 
-    while dice[-1] >= explode[kind]:
+    while dice[-1] >= explode:
         dice.append(d10())
 
     result = sum(dice)
@@ -234,24 +246,21 @@ def roll(kind):
     return result, sequence
 
 
-def throw(r, k, kind, mod):
+def throw(r, k, mods, add):
     """Print a single throw with the given kind and modifier."""
-    rolls = [roll(kind) for i in range(r)]
+    rolls = [roll(mods) for i in range(r)]
     rolls.sort(reverse=True)
     high_rolls, low_rolls = rolls[:k], rolls[k:]
 
-    result = '{0}: '.format(sum(r for r,s in high_rolls) + mod)
+    result = '{0}: '.format(sum(r for r,s in high_rolls) + add)
     kept = ', '.join(s for r, s in high_rolls)
-
-    bonus = ''
-    if mod != 0:
-        bonus = ' [{0:+}]'.format(mod)
-
+    bonus = '' if add == 0 else ' [{0:+}]'.format(add)
     unkept = ''
     if low_rolls:
         unkept = ' <<<>>> ' + ', '.join(s for r, s in low_rolls)
 
     print('\n  ' + result + kept + bonus + unkept + '\n')
+
 
 def show_prob(r, k, kind, mod):
     """Print a table of probabilites for the given throw"""
@@ -273,22 +282,13 @@ def show_prob(r, k, kind, mod):
 ########## Calculating Probabilities ##########
 
 
-def memoize(function):
-    cache = {}
-    def new_function(*args):
-        if args not in cache:
-            cache[args] = function(*args)
-        return cache[args]
-    return new_function
-
-
-@memoize
+@lru_cache(maxsize=None)
 def C(n, r):
     """Return the number of combinations of n objects taken r at a time"""
     return factorial(n) / (factorial(r) * factorial(n-r))
 
 
-@memoize
+@lru_cache(maxsize=None)
 def F(n):
     """Return the chance of getting n on a single die"""
     if n < 1 or n > 10:
@@ -297,7 +297,7 @@ def F(n):
         return 0.1
 
 
-@memoize
+@lru_cache(maxsize=None)
 def standard(n):
     """Return the chance of getting n on a standard roll"""
     if n < 10:
@@ -306,20 +306,7 @@ def standard(n):
         return F(10) * standard(n - 10)
 
 
-@memoize
-def emphasis(n):
-    """Return the chance of getting n on a roll with emphasis
-
-    For this type of roll, if the first die comes up 1, then it is
-    rerolled.  All further 1's are not rerolled.
-    """
-    if n == 1:
-        return F(1) * F(1)
-    else:
-        return standard(n) + F(1) * standard(n)
-
-
-@memoize
+@lru_cache(maxsize=None)
 def mastery(n):
     """Return the chance of getting n on a roll with mastery
 
@@ -331,12 +318,25 @@ def mastery(n):
         return F(9) * mastery(n - 9) + F(10) * mastery(n - 10)
 
 
-@memoize
+@lru_cache(maxsize=None)
+def emphasis(n, D):
+    """Return the chance of getting n on a roll of kind D with emphasis.
+
+    For this type of roll, if the first die comes up 1, then it is
+    rerolled.  All further 1's are not rerolled.
+    """
+    if n == 1:
+        return F(1) * F(1)
+    else:
+        return D(n) + F(1) * D(n)
+
+
+@lru_cache(maxsize=None)
 def P(r, k, v, t, D):
     """Calculate throw probability with a number of constraints
 
     Given roll r, keep k, what is the chance that the result of the throw
-    is v and that all rolls are t or less?
+    is v and that all rolls are t or less? D is the PDF of the roll.
     """
     # There's no chance of throwing less than one
 
@@ -360,7 +360,7 @@ def P(r, k, v, t, D):
     #   P(...): The chance that the rest of the rolls add up with the
     #       n rolls of t to get the desired total, v
 
-    for n in range(1, k):
+    for n in range(1, k+1):
         acc += C(r, n) * (D(t) ** n) * P(r-n, k-n, v-n*t, t-1, D)
 
     # Having examined up to k rolls, now consider exactly k rolls of t.
@@ -390,18 +390,23 @@ def P(r, k, v, t, D):
     return acc
 
 
-@memoize
-def throw_v(r, k, v, kind):
+@lru_cache(maxsize=None)
+def throw_v(r, k, v, mods):
     """Return the probability of getting exactly v for roll r, keep k"""
-    pdf = {'u' : F, 's' : standard, 'm' : mastery, 'e' : emphasis}
-    return P(r, k, v, v, pdf[kind])
+    pdf = {'' : standard,
+           'u' : F,
+           'm' : mastery,
+           'e' : partial(emphasis, D=standard),
+           'em': partial(emphasis, D=mastery)}
+    return P(r, k, v, v, pdf[mods])
 
 
-@memoize
-def throw_v_or_up(r, k, v, kind):
+@lru_cache(maxsize=None)
+def throw_v_or_up(r, k, v, mods):
     """Return the probability of getting v or higher for roll r, keep k"""
-    return 1 - sum(throw_v(r, k, i, kind) for i in range(1, v))
+    return 1 - sum(throw_v(r, k, i, mods) for i in range(1, v))
 
 
 if __name__ == '__main__':
     main()
+
