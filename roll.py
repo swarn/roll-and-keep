@@ -337,57 +337,44 @@ def emphasis(n, D):
 def P(r, k, v, t, D):
     """Calculate throw probability with a number of constraints
 
-    Given roll r, keep k, what is the chance that the result of the throw
-    is v and that all rolls are t or less? D is the PDF of the roll.
+    Given roll r, keep k, with PDF D, what is the probability that the result
+    of the throw is v and that no roll is greater than t?
     """
-    # There's no chance of throwing less than one
+    # Start with a base case: if keeping zero rolls and looking for a total of
+    # zero, then the question degenerates to "what is the chance that all rolls
+    # are not greater than t?
+    if k == 0 and v == 0:
+        lt_t = sum(D(i) for i in range(1, t + 1))
+        return lt_t ** r
 
+    # The other base cases, where e.g. we want to roll a negative value, have
+    # probability 0.
     if r < 1 or k < 1 or v < 1 or t < 1:
-        return D(0)
+        return 0.0
 
-    # The chance of throwing v when all the rolls are t or less includes
-    # the chance of throwing v when all the rolls are t-1 or less.
-
+    # First, calculate the probability of throwing v when all the rolls are
+    # strictly less than t.
     acc = P(r, k, v, t - 1, D)
 
-    # Now, add the chance of throwing v when at least one roll is t.
-    # First count the throws where there are less than k rolls of t.  For
-    # example, on 5k3, this loop would add the chance of rolling t once
-    # and the chance of rolling t twice.  The terms are:
-    #
-    #   C(r,n): The number of ways to get a result, n times, on r rolls
-    #
-    #   D(t) ** n: The chance of throwing t on n rolls
-    #
-    #   P(...): The chance that the rest of the rolls add up with the
-    #       n rolls of t to get the desired total, v
+    # Now, add the probability of throwing v when there are between 1 and r
+    # rolls of t.
+    for n in range(1, r + 1):
 
-    for n in range(1, k + 1):
-        acc += C(r, n) * (D(t) ** n) * P(r - n, k - n, v - n * t, t - 1, D)
+        # The number of different ways to get a result n times on r rolls
+        c = C(r, n)
 
-    # Having examined up to k rolls, now consider exactly k rolls of t.
-    # This means all kept rolls have a value of t, since t is the the
-    # highest rolled value.  This means that for n = k and higher, all
-    # throws will have result k * t.  If this value does not match v,
-    # then none of these throws will contribute to the chance of throwing
-    # v, and the function can return now.
+        # The probability of rolling t on n rolls
+        p_n_t = D(t) ** n
 
-    if k * t != v:
-        return acc
+        # The number of dice left to keep after rolling t on n rolls
+        k_rest = k - min(n, k)
 
-    # The value of k * t is equal to v.  This means that the other
-    # rolls (the rolls that are not t) can add up to any value, as long
-    # as they are all individually less than t.  The terms:
-    #
-    #   C(r, n): The number of ways to roll n results on r rolls
-    #
-    #   D(t) ** n: The chance of rolling t on on n rolls
-    #
-    #   lt_t ** (r-n): The chance of rolling less than t on r rolls
+        # To get the desired v, the remaining kept dice must have this value
+        v_rest = v - min(n, k) * t
 
-    lt_t = sum(D(i) for i in range(t))
-    for n in range(k, r + 1):
-        acc += C(r, n) * (D(t) ** n) * (lt_t ** (r - n))
+        # The probability that we rolled t on n rolls and that the remaining
+        # rolls give us the desired v
+        acc += c * p_n_t * P(r - n, k_rest, v_rest, t - 1, D)
 
     return acc
 
