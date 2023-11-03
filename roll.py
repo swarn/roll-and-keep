@@ -70,12 +70,13 @@ advanced_text = """
 
 
 class CommandLoop(cmd.Cmd, object):
-    prompt = '(roll) '
+    prompt = "(roll) "
     intro = """
     L5R Dice Rolling: type 'help' for options
     """
+
     def do_help(self, s):
-        if s == 'advanced':
+        if s == "advanced":
             print(advanced_text)
         else:
             print(help_text)
@@ -85,7 +86,7 @@ class CommandLoop(cmd.Cmd, object):
         if opts:
             throw(*opts)
         else:
-            print('\n  *** invalid input string ***\n')
+            print("\n  *** invalid input string ***\n")
 
     def emptyline(self):
         pass
@@ -95,13 +96,13 @@ class CommandLoop(cmd.Cmd, object):
         if opts:
             show_prob(*opts)
         else:
-            print('\n  *** invalid input string ***\n')
+            print("\n  *** invalid input string ***\n")
 
-    def do_EOF(self, s):
+    def do_EOF(self, _):
         print()
         return True
 
-    def do_quit(self, s):
+    def do_quit(self, _):
         return True
 
     do_exit = do_quit
@@ -122,13 +123,16 @@ def parse_input(in_string):
       mods: variants of roll mechanics, chars from [ume]
       add:  static bonus/penalty to roll
     """
-    regex = re.compile(r'''
+    regex = re.compile(
+        r"""
         (\d+)k(\d+)             # dice to roll and keep
         ([mue]*)?               # optional kind
         (\s*[+-]\s*\d+)?        # optional modifier
         (\s*b\s*)?              # optional uncapped roll
         \s*$                    # and nothing else
-        ''', re.VERBOSE)
+        """,
+        re.VERBOSE,
+    )
 
     m = regex.match(in_string)
     if not m:
@@ -137,9 +141,9 @@ def parse_input(in_string):
     p = m.groups()
 
     r, k = int(p[0]), int(p[1])
-    mods = '' if not p[2] else p[2]
-    mods = 'em' if mods == 'me' else mods
-    if 'u' in mods and 'm' in mods:
+    mods = "" if not p[2] else p[2]
+    mods = "em" if mods == "me" else mods
+    if "u" in mods and "m" in mods:
         return
     add = 0 if not p[3] else int(p[3])
     capped = not p[4]
@@ -151,7 +155,7 @@ def parse_input(in_string):
         if r_new != r or k_new != k:
             old = show_par(r, k, add)
             new = show_par(r_new, k_new, add_new)
-            print('\n  {0} ==> {1}'.format(old, new))
+            print("\n  {0} ==> {1}".format(old, new))
             r, k, add = r_new, k_new, add_new
 
     return r, k, mods, add
@@ -212,8 +216,9 @@ def cap(r, k, add):
 #   Throw: Rolling some number of times, and summing the result of
 #       highest rolls.
 
+
 def d10():
-    return random.randint(1,10)
+    return random.randint(1, 10)
 
 
 def roll(mods):
@@ -225,42 +230,42 @@ def roll(mods):
 
     returns a tuple: (result, (string representing roll sequence))
     """
-    expertise = 'e' in mods
+    expertise = "e" in mods
     explode = 10
-    if 'm' in mods:
+    if "m" in mods:
         explode = 9
-    elif 'u' in mods:
+    elif "u" in mods:
         explode = 11
 
     dice = [d10()]
-    sequence = ''
+    sequence = ""
 
-    if 'e' in mods and dice[0] == 1:
-        sequence = '1 -> '
+    if expertise and dice[0] == 1:
+        sequence = "1 -> "
         dice = [d10()]
 
     while dice[-1] >= explode:
         dice.append(d10())
 
     result = sum(dice)
-    sequence += ' + '.join(str(die) for die in dice)
+    sequence += " + ".join(str(die) for die in dice)
     return result, sequence
 
 
 def throw(r, k, mods, add):
     """Print a single throw with the given kind and modifier."""
-    rolls = [roll(mods) for i in range(r)]
+    rolls = [roll(mods) for _ in range(r)]
     rolls.sort(reverse=True)
     high_rolls, low_rolls = rolls[:k], rolls[k:]
 
-    result = '{0}: '.format(sum(r for r,s in high_rolls) + add)
-    kept = ', '.join(s for r, s in high_rolls)
-    bonus = '' if add == 0 else ' [{0:+}]'.format(add)
-    unkept = ''
+    result = "{0}: ".format(sum(r for r, _ in high_rolls) + add)
+    kept = ", ".join(s for _, s in high_rolls)
+    bonus = "" if add == 0 else " [{0:+}]".format(add)
+    unkept = ""
     if low_rolls:
-        unkept = ' <<<>>> ' + ', '.join(s for r, s in low_rolls)
+        unkept = " <<<>>> " + ", ".join(s for _, s in low_rolls)
 
-    print('\n  ' + result + kept + bonus + unkept + '\n')
+    print("\n  " + result + kept + bonus + unkept + "\n")
 
 
 def show_prob(r, k, kind, mod):
@@ -274,10 +279,10 @@ def show_prob(r, k, kind, mod):
     TNs = [min_TN + i * 5 for i in range(14)]
     probs = [throw_v_or_up(r, k, TN, kind) for TN in TNs]
 
-    tn_line = ' TN: ' + ''.join('{0:^5}'.format(TN + mod) for TN in TNs)
-    prob_line = '   %: ' + ''.join('{0:^5.0%}'.format(p) for p in probs)
-    print('\n', tn_line)
-    print(prob_line, '\n')
+    tn_line = " TN: " + "".join("{0:^5}".format(TN + mod) for TN in TNs)
+    prob_line = "   %: " + "".join("{0:^5.0%}".format(p) for p in probs)
+    print("\n", tn_line)
+    print(prob_line, "\n")
 
 
 ########## Calculating Probabilities ##########
@@ -286,10 +291,9 @@ def show_prob(r, k, kind, mod):
 @lru_cache(maxsize=None)
 def C(n, r):
     """Return the number of combinations of n objects taken r at a time"""
-    return factorial(n) / (factorial(r) * factorial(n-r))
+    return factorial(n) / (factorial(r) * factorial(n - r))
 
 
-@lru_cache(maxsize=None)
 def F(n):
     """Return the chance of getting n on a single die"""
     if n < 1 or n > 10:
@@ -347,7 +351,7 @@ def P(r, k, v, t, D):
     # The chance of throwing v when all the rolls are t or less includes
     # the chance of throwing v when all the rolls are t-1 or less.
 
-    acc = P(r, k, v, t-1, D)
+    acc = P(r, k, v, t - 1, D)
 
     # Now, add the chance of throwing v when at least one roll is t.
     # First count the throws where there are less than k rolls of t.  For
@@ -361,8 +365,8 @@ def P(r, k, v, t, D):
     #   P(...): The chance that the rest of the rolls add up with the
     #       n rolls of t to get the desired total, v
 
-    for n in range(1, k+1):
-        acc += C(r, n) * (D(t) ** n) * P(r-n, k-n, v-n*t, t-1, D)
+    for n in range(1, k + 1):
+        acc += C(r, n) * (D(t) ** n) * P(r - n, k - n, v - n * t, t - 1, D)
 
     # Having examined up to k rolls, now consider exactly k rolls of t.
     # This means all kept rolls have a value of t, since t is the the
@@ -385,7 +389,7 @@ def P(r, k, v, t, D):
     #   lt_t ** (r-n): The chance of rolling less than t on r rolls
 
     lt_t = sum(D(i) for i in range(t))
-    for n in range(k, r+1):
+    for n in range(k, r + 1):
         acc += C(r, n) * (D(t) ** n) * (lt_t ** (r - n))
 
     return acc
@@ -394,11 +398,13 @@ def P(r, k, v, t, D):
 @lru_cache(maxsize=None)
 def throw_v(r, k, v, mods):
     """Return the probability of getting exactly v for roll r, keep k"""
-    pdf = {'' : standard,
-           'u' : F,
-           'm' : mastery,
-           'e' : partial(emphasis, D=standard),
-           'em': partial(emphasis, D=mastery)}
+    pdf = {
+        "": standard,
+        "u": F,
+        "m": mastery,
+        "e": partial(emphasis, D=standard),
+        "em": partial(emphasis, D=mastery),
+    }
     return P(r, k, v, v, pdf[mods])
 
 
@@ -408,6 +414,5 @@ def throw_v_or_up(r, k, v, mods):
     return 1 - sum(throw_v(r, k, i, mods) for i in range(1, v))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
