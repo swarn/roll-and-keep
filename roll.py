@@ -159,12 +159,13 @@ def parse_input(in_string):
 
 def show_par(r, k, mod):
     """Returns string describing throw parameters."""
-    bonus = ''
-    if mod < 0:
-        bonus = ' - {0}'.format(-mod)
-    elif mod > 0:
-        bonus = ' + {0}'.format(mod)
-    return '{0}k{1}{2}'.format(r, k, bonus)
+    dice = f"{r}k{k}"
+
+    if mod != 0:
+        sign = "+" if mod > 0 else "-"
+        return f"{dice} {sign} {abs(mod)}"
+
+    return dice
 
 
 def cap(r, k, add):
