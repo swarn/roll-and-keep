@@ -19,7 +19,7 @@
 import cmd
 import random
 import re
-from functools import lru_cache, partial
+from functools import cache, partial
 from math import factorial
 
 random.seed()
@@ -285,7 +285,7 @@ def show_prob(r, k, kind, mod):
 ########## Calculating Probabilities ##########
 
 
-@lru_cache(maxsize=None)
+@cache
 def C(n, r):
     """Return the number of combinations of n objects taken r at a time"""
     return factorial(n) / (factorial(r) * factorial(n - r))
@@ -299,7 +299,7 @@ def F(n):
         return 0.1
 
 
-@lru_cache(maxsize=None)
+@cache
 def standard(n):
     """Return the chance of getting n on a standard roll"""
     if n < 10:
@@ -308,7 +308,7 @@ def standard(n):
         return F(10) * standard(n - 10)
 
 
-@lru_cache(maxsize=None)
+@cache
 def mastery(n):
     """Return the chance of getting n on a roll with mastery
 
@@ -320,7 +320,7 @@ def mastery(n):
         return F(9) * mastery(n - 9) + F(10) * mastery(n - 10)
 
 
-@lru_cache(maxsize=None)
+@cache
 def emphasis(n, D):
     """Return the chance of getting n on a roll of kind D with emphasis.
 
@@ -333,7 +333,7 @@ def emphasis(n, D):
         return D(n) + F(1) * D(n)
 
 
-@lru_cache(maxsize=None)
+@cache
 def P(r, k, v, t, D):
     """Calculate throw probability with a number of constraints
 
@@ -392,7 +392,7 @@ def P(r, k, v, t, D):
     return acc
 
 
-@lru_cache(maxsize=None)
+@cache
 def throw_v(r, k, v, mods):
     """Return the probability of getting exactly v for roll r, keep k"""
     pdf = {
@@ -405,7 +405,7 @@ def throw_v(r, k, v, mods):
     return P(r, k, v, v, pdf[mods])
 
 
-@lru_cache(maxsize=None)
+@cache
 def throw_v_or_up(r, k, v, mods):
     """Return the probability of getting v or higher for roll r, keep k"""
     return 1 - sum(throw_v(r, k, i, mods) for i in range(1, v))
