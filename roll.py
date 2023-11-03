@@ -16,11 +16,11 @@
 #
 # Roll-and-Keep is a trademark of Alderac Entertainment Group
 
+import cmd
 import random
 import re
-import cmd
+from functools import lru_cache, partial
 from math import factorial
-from functools import partial, lru_cache
 
 random.seed()
 
@@ -145,7 +145,7 @@ def parse_input(in_string):
     mods = "em" if mods == "me" else mods
     if "u" in mods and "m" in mods:
         return
-    add = 0 if not p[3] else int(p[3])
+    add = 0 if not p[3] else int(re.sub(r"\s+", "", p[3]))
     capped = not p[4]
 
     # if the roll is capped (the default), call the cap function and print
@@ -163,13 +163,10 @@ def parse_input(in_string):
 
 def show_par(r, k, mod):
     """Returns string describing throw parameters."""
-    dice = f"{r}k{k}"
+    if mod == 0:
+        return f"{r}k{k}"
 
-    if mod != 0:
-        sign = "+" if mod > 0 else "-"
-        return f"{dice} {sign} {abs(mod)}"
-
-    return dice
+    return f"{r}k{k} {'+' if mod > 0 else '-'} {abs(mod)}"
 
 
 def cap(r, k, add):
